@@ -11,6 +11,7 @@ import builder from '../builder'
 import bundler from '../bundler'
 import scanner from './scanner'
 import opts from '../opts'
+import Flow from '../flow'
 
 const serializeCache = _.debounce(cache.serialize, 600)
 const hasFinished = () => hasBuilt() && opts('hasRunInitialInstall')
@@ -42,12 +43,15 @@ export function scripts({ inFiles = [], userStream }) {
 
   const superStream = new SuperStream()
 
+  const flow = new Flow(bridge)
+
   return (
     opts('watching') ?
     $.merge(scripts, dirAddStream(opts('appDir')), superStream.getStream()) :
     scripts
   )
       .pipe($.if(buildCheck, $.ignore.exclude(true)))
+      .pipe($.fn(queueFlow))
       .pipe($.fn(reset))
       .pipe($.plumber(catchError))
       .pipe($.fn(setLastFile))
@@ -290,6 +294,10 @@ export function scripts({ inFiles = [], userStream }) {
 
     log.gulp('not writeable')
     return false
+  }
+
+  function queueFlow() {
+    flow.queue()
   }
 
   function afterWrite(file) {

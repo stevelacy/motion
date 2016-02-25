@@ -35,6 +35,7 @@ export default function handleError(handle) {
     error.stack = unicodeToChar(error.stack || error.codeFrame)
 
     logError(error)
+    console.log('sending compile error', error);
 
     bridge.broadcast('compile:error', { error }, 'error')
   }
