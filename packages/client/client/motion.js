@@ -13,9 +13,11 @@ import './shim/root'
 import './shim/exports'
 import './shim/on'
 import './lib/promiseErrorHandle'
+import $ from './$'
 import internal from './internal'
 import onError from './shim/motion'
 import createComponent from './createComponent'
+import __motionRender from './lib/__motionRender.js'
 import range from './lib/range'
 import iff from './lib/iff'
 import router from './lib/router'
@@ -52,11 +54,6 @@ const Motion = {
       originalWarn.call(console, ...args)
     }
 
-    // prevent breaking when writing $ styles in auto-save mode
-    if (!process.env.production) {
-      root.$ = null
-    }
-
     if (process.env.production) {
       rafBatch.inject()
     }
@@ -91,7 +88,6 @@ const Motion = {
 
     // init Internal
     const Internal = internal.init(ID)
-    root._Motion = Internal
 
     // tools bridge
     const Tools = root._DT
@@ -115,6 +111,10 @@ const Motion = {
     //
 
     let Motion = {}
+
+    root.exports.Motion = Motion
+    root._Motion = Internal
+    root.$ = $(Motion)
 
     let createComponent2 = createComponent.bind(null, Motion, Internal)
 
@@ -176,8 +176,11 @@ const Motion = {
           if (!Main) {
             if (Internal.lastWorkingRenders.Main)
               Main = LastWorkingMain
-            else
-              Main = MainErrorView
+          }
+
+          if (!Main) {
+            console.log('No main view found, add a Motion.entry(MainView) to render')
+            return
           }
 
           // server render
@@ -229,6 +232,8 @@ const Motion = {
       },
 
       componentClass(component) {
+        component.prototype.el = createElement
+        component.prototype.__motionRender = __motionRender
         return Motion.markComponent(nextComponentName, component, Motion.viewTypes.CLASS)
       },
 

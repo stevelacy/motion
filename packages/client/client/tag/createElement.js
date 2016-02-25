@@ -24,17 +24,17 @@ export default function createElement(identifier : Identifier, _props, ...args) 
     return React.createElement(identifier[1], _props, ...args)
 
   const view = this
-  const Motion = view.Motion
+  const Motion = view.Motion || root.exports.Motion
 
-  const el: Element = getElement(identifier, view, _props, Motion)
-  const props = elementProps(el, view, Motion, _props)
-  props.style = elementStyles(el, view, props)
+  const el: Element = getElement(Motion, identifier, view, _props)
+  const props = elementProps(Motion, el, view, _props)
+  props.style = elementStyles(Motion, el, view, props)
 
   // TODO option to disable object stringifying
   if (!process.env.production)
     args = stringifyObjects(el, args, view)
 
-  const tag = props.tagName || (el.whitelisted ? DIV : el.component || el.name)
+  const tag = props.tagName || (el.blacklisted ? DIV : el.component || el.name)
 
   return React.createElement(tag, props, ...args)
 }
