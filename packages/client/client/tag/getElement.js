@@ -11,7 +11,7 @@ import { whitelist } from './constants'
 */
 
 
-export default function getElement(identifier: Identifier, view, props, getView): Element {
+export default function getElement(identifier: Identifier, view, props, Motion): Element {
   let isView = false
   let name, tagName, key, index, component, repeatItem
 
@@ -22,6 +22,8 @@ export default function getElement(identifier: Identifier, view, props, getView)
   // passing in a variable as the view
   else if (typeof identifier[0] !== 'string') {
     [component, name, key, repeatItem, index] = identifier
+
+    component = Motion.getComponent(component)
   }
   // passing in string ref as view
   else {
@@ -35,7 +37,7 @@ export default function getElement(identifier: Identifier, view, props, getView)
 
   // find element
   if (typeof name != 'string') {
-    component = name
+    component = Motion.getComponent(name)
   }
   else {
     let isHTMLElement = name[0].toLowerCase() == name[0]
@@ -54,7 +56,7 @@ export default function getElement(identifier: Identifier, view, props, getView)
     // find a view
     else if (!component) {
       isView = true
-      component = getView(name)
+      component = Motion.getView(name)
     }
   }
 

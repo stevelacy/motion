@@ -22,14 +22,15 @@ type CacheState = {
     name: File;
     time: Date;
   };
+  meta: object;
   externals: ImportArray;
   internals: ImportArray;
 }
 
-let meta = {}
 let previousCache: CacheState
 let cache: CacheState = {
   files: {},
+  meta: {},
   imports: [],
   fileMeta: {}
 }
@@ -125,6 +126,10 @@ const Cache = {
     return cache.files
   },
 
+  getAllNames() {
+    return Object.keys(cache.files)
+  },
+
   getPrevious(file: string) {
     return previousCache.files[relative(file)]
   },
@@ -164,11 +169,11 @@ const Cache = {
   },
 
   setFileMeta(file: string, fileMeta: object) {
-    meta[relative(file)] = fileMeta
+    cache.meta[relative(file)] = fileMeta
   },
 
   getFileMeta(file: string) {
-    return meta[relative(file)]
+    return cache.meta[relative(file)]
   },
 
   setFileSrc(file: string, src: string) {
@@ -189,6 +194,11 @@ const Cache = {
 
     if (wasInternal != isInternal)
       onSetExported(name, isInternal)
+
+    process.children.server.send(JSON.stringify({
+      type: 'cache',
+      data: cache
+    }))
   },
 
   getExported() {
@@ -253,7 +263,6 @@ const Cache = {
 
   removeError(file : string) {
     const f = getFile(file)
-    log.cache('removeError', f)
     f.error = null
   },
 

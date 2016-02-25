@@ -63,6 +63,7 @@ const Motion = {
 
     // shims
     root.React = React
+    root.Component = React.Component
     root.ReactDOM = ReactDOM
     root.global = root // for radium
     root.regeneratorRuntime = regeneratorRuntime
@@ -107,18 +108,32 @@ const Motion = {
     const LastWorkingMain = LastWorkingMainFactory(Internal)
 
     const emitter = ee({})
+    let nextComponentName = null
 
     //
     // begin the motionception
     //
 
-    const Motion = {
+    let Motion = {}
+
+    let createComponent2 = createComponent.bind(null, Motion, Internal)
+
+    Motion = Object.assign(Motion, {
       start() {
-        router.init(ID, { onChange: Motion.render })
-        Motion.render()
+        if (!Internal.entry) {
+          Internal.entry = Motion.views.Main
+        }
+
+        router.init(ID, { onChange: Motion.run })
+        Motion.run()
       },
 
       views: {},
+      viewTypes: {
+        FN: 'FN',
+        SIMPLE: 'SIMPLE',
+        CLASS: 'CLASS'
+      },
 
       // beta
       _onViewInstance: (name, decorator) => !decorator
@@ -138,7 +153,11 @@ const Motion = {
       preloaders: [],
       preload(fn) { Motion.preloaders.push(fn) },
 
-      render() {
+      entry(entry) {
+        Internal.entry = Motion.getComponent(entry)
+      },
+
+      run() {
         if (Motion.preloaders.length) {
           return Promise
             .all(Motion.preloaders.map(loader => typeof loader == 'function' ? loader() : loader))
@@ -152,11 +171,14 @@ const Motion = {
           if (Internal.isRendering > 3) return
 
           // find Main
-          let Main = Internal.views.Main && Internal.views.Main.component
-          if (!Main && Internal.lastWorkingRenders.Main)
-            Main = LastWorkingMain
-          if (!Main)
-            Main = MainErrorView
+          let Main = Internal.entry
+
+          if (!Main) {
+            if (Internal.lastWorkingRenders.Main)
+              Main = LastWorkingMain
+            else
+              Main = MainErrorView
+          }
 
           // server render
           if (!opts.node) {
@@ -174,6 +196,8 @@ const Motion = {
               </StyleRoot>,
               document.getElementById(opts.node)
             )
+
+            Internal.firstRender = false
           }
 
           Internal.lastWorkingViews.Main = Main
@@ -190,18 +214,63 @@ const Motion = {
       // for use in jsx
       debug: () => { debugger },
 
+      getComponent(component) {
+        const { name, type } = component.__motioninfo__
+
+        if (!Internal.views[name]) {
+          Motion.makeComponent(name, component, type)
+        }
+
+        return Internal.views[name]
+      },
+
+      nextComponent(name) {
+        nextComponentName = name
+      },
+
+      componentClass(component) {
+        return Motion.markComponent(nextComponentName, component, Motion.viewTypes.CLASS)
+      },
+
+      componentFn(name, component) {
+        return Motion.markComponent(name, component, Motion.viewTypes.FN)
+      },
+
+      markComponent(name, component, type) {
+        component.__motioninfo__ = { name, type }
+
+        // so that it updates
+        delete Internal.views[name]
+        delete Motion.views[name]
+
+        Internal.changedViews.push(name)
+        let viewsInFile = Internal.viewsInFile[Internal.currentHotFile]
+        if (viewsInFile) viewsInFile.push(name)
+
+        return component
+      },
+
+      makeComponent(name, component, type) {
+        Internal.views[name] = createComponent2(name, component, { changed: true, type })
+        Motion.views[name] = component
+
+        return component
+      },
+
       view(name, body) {
-        const comp = opts => createComponent(Motion, Internal, name, body, opts)
-
-        if (process.env.production)
-          return setView(name, comp())
-
-        const hash = hashsum(body)
+        function comp(opts = {}) {
+          return createComponent2(name, body, { ...opts, type: Motion.viewTypes.VIEW })
+        }
 
         function setView(name, component) {
           Internal.views[name] = { hash, component, file: Internal.currentHotFile }
           Motion.views[name] = component
         }
+
+        if (process.env.production)
+          return setView(name, comp())
+
+        const hash = hashsum(body)
 
         // set view in cache
         let viewsInFile = Internal.viewsInFile[Internal.currentHotFile]
@@ -300,7 +369,7 @@ const Motion = {
 
           // safe re-render
           if (isNewFile || removedViews.length || addedViews.length)
-            return Motion.render()
+            return Motion.run()
 
           // if outside of views the FILE changed, refresh all views in file
           if (!Internal.changedViews.length && Internal.fileChanged[file]) {
@@ -341,7 +410,7 @@ const Motion = {
         }
 
         delete Internal.viewCache[name]
-        Motion.render()
+        Motion.run()
       },
 
       routeMatch(path) {
@@ -362,7 +431,7 @@ const Motion = {
       range,
       iff,
       noop: function(){},
-    }
+    })
 
     // view shim (TODO freeze)
     root.view = {

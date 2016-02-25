@@ -12,6 +12,60 @@ export default function init(_options, _t) {
 export function t() {}
 export function options() {}
 
+export function isComponentReturn(node) {
+  if (t.isArrayExpression(node)) {
+    let numJSX = 0
+
+    for (let i = 0; i < node.elements.length; i++) {
+      let el = node.elements[i]
+
+      const isJSX = t.isJSXElement(el)
+      const isStyle = t.isObjectExpression(el)
+
+      if (isJSX)
+        numJSX++
+
+      // avoid if not jsx or style
+      if (!isJSX && !isStyle) {
+        return false
+      }
+    }
+
+    // for now dumb, just detect an array with one jsx
+    return !!numJSX
+  }
+}
+
+// array of dom+style
+export function componentReturn(node) {
+  for (let i = 0; i < node.elements.length; i++) {
+    let el = node.elements[i]
+
+    if (t.isJSXElement(el)) {
+      node.elements[i] = t.functionExpression(null, [], t.blockStatement([ t.returnStatement(el) ]))
+    }
+  }
+
+  return node
+}
+
+export function component({ name, node, type = component.CLASS }) {
+  if (type == component.SIMPLE) {
+    // add view as first parameter
+    node.params = [ t.identifier('view'), ...node.params ]
+  }
+
+  const wrapped = t.callExpression(t.identifier(type), [t.literal(name), node])
+  wrapped.isMotionHot = true
+  return wrapped
+}
+
+component.SIMPLE = 'Motion.componentFn'
+component.CLASS = 'Motion.componentClass'
+
+component.simple = opts => component({ ...opts, type: component.SIMPLE })
+component.class = opts => component({ ...opts, type: component.CLASS })
+
 let niceAttrs = {
   className: 'class',
   htmlFor: 'for',
@@ -182,7 +236,11 @@ export function parentFunctionNode(scope) {
   if (t.isArrowFunctionExpression(scope.parentBlock.init))
     return scope.parentBlock.init
 
-  const parentFunc = scope.path.findParent(p => p.isFunction())
+  const parentFunc = scope.path.findParent(p => {
+    // console.log(p.type)
+    return p.isFunction() || p.isMethodDefinition()
+  })
+
   return parentFunc && parentFunc.node
 }
 

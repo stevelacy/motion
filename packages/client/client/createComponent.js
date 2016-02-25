@@ -37,10 +37,21 @@ export default function createComponent(Motion, Internal, name, view, options = 
     return wrapComponent(createViewComponent())
 
   // development
-  views[name] = createViewComponent()
+  switch(options.type) {
+    case Motion.viewTypes.VIEW:
+      views[name] = createViewComponent()
+      break
+    case Motion.viewTypes.CLASS:
+      views[name] = view
+      break
+    case Motion.viewTypes.FN:
+      views[name] = createFnComponent()
+      break
+  }
 
   // once rendered, isChanged is used to prevent
   // unnecessary props hashing, for faster hot reloads
+  // TODO once?
   Motion.on('render:done', () => {
     isChanged = false
   })
@@ -103,6 +114,18 @@ export default function createComponent(Motion, Internal, name, view, options = 
         Internal.paths[this.pathKey] = this.path
       },
 
+      componentDidMount() {
+        if (options.isView) return
+
+        Internal.mountedViews[name] = Internal.mountedViews[name] || []
+        Internal.mountedViews[name].push(this)
+        Internal.viewsAtPath[this.getPath()] = this
+      },
+
+      componentWillUnmount() {
+        // TODO remove from mounted views
+      },
+
       onMount(component) {
         const path = this.getPath()
         const lastRendered = component.lastRendered
@@ -131,7 +154,48 @@ export default function createComponent(Motion, Internal, name, view, options = 
     })
   }
 
-  // create view
+
+  // for regular function style components
+  function createFnComponent() {
+    let component = {
+      renders: [], // TODO remove this, fix bugs
+      name,
+      displayName: name,
+      Motion,
+      el: createElement,
+
+      getArgs() {
+        let args = {
+          props: this.props,
+          update: this.setState.bind(this)
+        }
+
+        if (this.state)
+          args.state = this.state
+
+        return args
+      },
+
+      render() {
+        let [ dom, style ] = view.call(null, component, this.getArgs())
+        this.styles = style
+        return dom
+      }
+    }
+
+    let [ __motioninfo__, ...statics ] = Object.keys(view)
+
+    // assign lifecycles and such
+    for (let key of statics) {
+      let val = view[key]
+      component[key] = function() { return val(this.getArgs()) }
+    }
+
+    return React.createClass(component)
+  }
+
+
+  // for custom view syntax
   function createViewComponent() {
     const component = React.createClass({
       displayName: name,
@@ -256,11 +320,6 @@ export default function createComponent(Motion, Internal, name, view, options = 
         // run props before mount
         if (name != 'Main') {
           this.runEvents('props', [this.props])
-        }
-        else {
-          // moved to here to fix issues where updating during first mount fails
-          //    see: https://github.com/motionjs/motion/issues/305
-          Internal.firstRender = false
         }
       },
 

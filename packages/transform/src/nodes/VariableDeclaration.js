@@ -1,5 +1,5 @@
 import state from '../state'
-import { t, options, propChange } from '../lib/helpers'
+import { t, options, propChange, component } from '../lib/helpers'
 import { wrapPropertyDeclarator, destructureTrackers, wrapDeclarator } from '../lib/wrapState'
 
 export default {
@@ -21,6 +21,18 @@ export default {
   exit(node, parent, scope, file) {
     if (node.isStyle || node._motionDeclarationParsed) return
     node._motionDeclarationParsed = true
+
+    // track React.createClass
+    for (let dec of node.declarations) {
+      if (t.isCallExpression(dec.init) && dec.init.callee.object) {
+        const { object, property } = dec.init.callee
+
+        if (object.name == 'React' && property.name == 'createClass') {
+          const name = dec.id.name
+          dec.init = component({ name, node: dec.init })
+        }
+      }
+    }
 
     // add getter
     if (scope.hasOwnBinding('view') && node.kind != 'const' && !node.motionTracked) {

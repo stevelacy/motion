@@ -7,15 +7,15 @@ export default {
   },
 
   exit(node, parent, scope, file) {
-    state.meta.file = file.opts.filename
+    state.file.meta.file = file.opts.filename
 
     if (options.onMeta) {
-      options.onMeta(state.meta)
+      options.onMeta(state.file.meta)
     }
 
     const location = relativePath(file.opts.filename)
 
-    if (!file.metadata.exports && !state.hasExports) {
+    if (!options.firstRun && state.file.meta.isHot) {
       // function(){ Motion.file('${location}',function(require, exports){ ${contents}\n  })\n}()
       node.body = [t.expressionStatement(
         // closure

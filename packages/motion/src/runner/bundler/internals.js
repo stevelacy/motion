@@ -8,20 +8,29 @@ import bridge from '../bridge'
 import disk from '../disk'
 import cache from '../cache'
 import opts from '../opts'
-import { log, logError, handleError, writeFile } from '../lib/fns'
+import { _, log, logError, handleError, writeFile } from '../lib/fns'
 
-export async function writeInternals(opts = {}) {
+// TODO we need a better way to manage what files are about to be bundled,
+// and then what actually gets picked up by webpack --watch, and then manage that queue
+let RELOAD = false
+
+export async function writeInternals({ force, reload } = {}) {
   try {
     await finishedInstalling()
 
-    if (opts.force || disk.internalsIn.hasChanged()) {
+    RELOAD = reload
+
+    if (force || disk.internalsIn.hasChanged()) {
       await disk.internalsIn.write((current, write) => {
-        const internals = cache.getExported()
+        const internals = cache.getAllNames()
 
         log.internals('internals', internals)
 
-        write(requireString(internals, {
-          prefix: './internal/',
+        // get user entry
+        const main = opts('config').entry.replace('./', '')
+
+        write(requireString(_.uniq([main, ...internals]), {
+          prefix: './out/',
           removeExt: true
         }))
       })
@@ -35,7 +44,7 @@ export async function writeInternals(opts = {}) {
 export function runInternals() {
   return webpack({
     name: 'internals',
-    onFinish: onInternalInstalled,
+    onFinish: () => RELOAD && onInternalInstalled(),
     config: {
       entry: opts('deps').internalsIn,
       externals: webpackUserExternals(),
