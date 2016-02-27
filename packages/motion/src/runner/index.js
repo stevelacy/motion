@@ -7,9 +7,13 @@ import { run as runStartup, build } from './startup'
 // print = we want to log this out, keep it
 global.print = console.log.bind(console)
 
-async function run() {
+async function run(options) {
   const cli = new CLI()
   cli.activate()
+  await runStartup(options, cli)
+  cli.addCommand('build', 'Build dist files of your motion app', async function() {
+    this.log('You asked me to build it')
+  })
   return cli
 }
 
