@@ -6,7 +6,6 @@ import opts from './opts'
 import disk from './disk'
 import gulp from './gulp'
 import cache from './cache'
-import keys from './keys'
 import watchDeletes from './lib/watchDeletes'
 import { logError, handleError, path, log } from './lib/fns'
 import Editor from './editor'
@@ -79,7 +78,6 @@ export async function run(opts) {
     cache.serialize() // write out cache
     await bundler.all()
     if (opts.watch) await builder.build()
-    keys.init()
   }
   catch(e) {
     handleError(e)
