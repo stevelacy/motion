@@ -27,12 +27,8 @@ async function run(options) {
     global.print = function() {
       cli.log(...arguments)
     }
-  }
-
-  await runStartup(options, cli)
-
-  if (showUI) {
     // Startup messages
+    await runStartup(options, cli)
     cli.log(chalk.green('Server running at') + ' ' + chalk.yellow('http://' + server.url()))
 
     cli.addCommand('open', 'Open this project in Browser', async function() {
@@ -45,6 +41,8 @@ async function run(options) {
     cli.addCommand('build', 'Build dist files of your motion app', async function() {
       await builder.build()
     })
+  } else {
+    await runStartup(options, cli)
   }
 }
 
